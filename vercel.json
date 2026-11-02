@@ -3,6 +3,7 @@
   "services": {
     "frontend": {
       "root": "frontend/",
+      "framework": "vite",
       "rewrites": [
         {
           "source": "/(.*)",
@@ -11,7 +12,9 @@
       ]
     },
     "backend": {
-      "root": "backend/"
+      "root": "backend/",
+      "framework": "django",
+      "entrypoint": "config.wsgi:application"
     }
   },
   "rewrites": [
