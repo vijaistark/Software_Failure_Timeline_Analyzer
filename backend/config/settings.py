@@ -6,17 +6,25 @@ from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DJANGO_SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
-SECRET_KEY = DJANGO_SECRET_KEY or 'dev-secret-key-change-me'
-DEBUG = os.getenv('DEBUG', 'False').lower() in {'1', 'true', 'yes', 'on'}
+IS_VERCEL = os.getenv('VERCEL') == '1'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY environment variable is not configured.')
+
+DEBUG = False if IS_VERCEL else os.getenv('DEBUG', 'False').lower() in {'1', 'true', 'yes', 'on'}
 ALLOWED_HOSTS = [
     host.strip() for host in os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost,testserver').split(',') if host.strip()
 ]
-if os.getenv('VERCEL_URL'):
-    ALLOWED_HOSTS.append(os.environ['VERCEL_URL'])
+for vercel_host in (os.getenv('VERCEL_URL'), os.getenv('VERCEL_PROJECT_PRODUCTION_URL')):
+    if vercel_host and vercel_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(vercel_host)
 
-if os.getenv('VERCEL') == '1' and not DJANGO_SECRET_KEY:
-    raise ImproperlyConfigured('Set DJANGO_SECRET_KEY in the Vercel project environment.')
+if IS_VERCEL:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -68,9 +76,10 @@ if DATABASE_URL:
             DATABASE_URL,
             conn_max_age=0,
             conn_health_checks=True,
+            ssl_require=IS_VERCEL,
         ),
     }
-elif os.getenv('VERCEL') == '1':
+elif IS_VERCEL:
     raise ImproperlyConfigured('Set DATABASE_URL to a persistent database in the Vercel project environment.')
 else:
     DATABASES = {
