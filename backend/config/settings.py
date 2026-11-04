@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import quote
 
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
@@ -70,17 +71,33 @@ WSGI_APPLICATION = 'config.wsgi.application'
 ASGI_APPLICATION = 'config.asgi.application'
 
 DATABASE_URL = os.getenv('DATABASE_URL')
+SUPABASE_DB_PASSWORD = os.getenv('SUPABASE_DB_PASSWORD')
+if SUPABASE_DB_PASSWORD:
+    DATABASE_URL = (
+        'postgresql://postgres:'
+        f'{quote(SUPABASE_DB_PASSWORD, safe="Vijaistark123")}@'
+        'db.ichppnttgnfvibqduthl.supabase.co:5432/postgres'
+    )
+
 if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=0,
-            conn_health_checks=True,
-            ssl_require=IS_VERCEL,
-        ),
-    }
+    try:
+        DATABASES = {
+            'default': dj_database_url.parse(
+                DATABASE_URL,
+                conn_max_age=0,
+                conn_health_checks=True,
+                ssl_require=IS_VERCEL,
+            ),
+        }
+    except ValueError as exc:
+        raise ImproperlyConfigured(
+            'The database URL is invalid. Set DATABASE_URL to a valid database URI, or set '
+            'SUPABASE_DB_PASSWORD for the configured Supabase project.'
+        ) from exc
 elif IS_VERCEL:
-    raise ImproperlyConfigured('Set DATABASE_URL to a persistent database in the Vercel project environment.')
+    raise ImproperlyConfigured(
+        'Set DATABASE_URL or SUPABASE_DB_PASSWORD in the Vercel project environment.'
+    )
 else:
     DATABASES = {
         'default': {
