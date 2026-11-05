@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
@@ -10,10 +11,43 @@ function UploadLogs() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  const MAX_FILE_SIZE = 1024 * 1024;
+
   function handleFileChange(event) {
     setError("");
     setMessage("");
-    setFiles(Array.from(event.target.files || []));
+
+    const selectedFiles = Array.from(event.target.files || []);
+
+    if (selectedFiles.length === 0) {
+      setFiles([]);
+      return;
+    }
+
+    if (selectedFiles.length > 10) {
+      setError("You can upload a maximum of 10 files.");
+      event.target.value = "";
+      setFiles([]);
+      return;
+    }
+
+    for (const file of selectedFiles) {
+      if (!file.name.toLowerCase().endsWith(".json")) {
+        setError(`${file.name}: Only JSON files are allowed.`);
+        event.target.value = "";
+        setFiles([]);
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        setError(`${file.name}: File size must not exceed 1 MB.`);
+        event.target.value = "";
+        setFiles([]);
+        return;
+      }
+    }
+
+    setFiles(selectedFiles);
   }
 
   function removeFile(index) {
@@ -29,7 +63,7 @@ function UploadLogs() {
     }
 
     if (files.length === 0) {
-      setError("Please select at least one log file.");
+      setError("Please select at least one JSON file.");
       return;
     }
 
@@ -46,14 +80,21 @@ function UploadLogs() {
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
 
-      await api.post(`/investigations/${investigationResponse.data.id}/upload/`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await api.post(
+        `/investigations/${investigationResponse.data.id}/upload/`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
 
-      setMessage("Logs uploaded and parsed successfully.");
+      setMessage("JSON logs uploaded and parsed successfully.");
       navigate(`/investigation/${investigationResponse.data.id}`);
     } catch (uploadError) {
-      const details = uploadError.response?.data?.detail || "There was an issue uploading the logs.";
+      const details =
+        uploadError.response?.data?.detail ||
+        "There was an issue uploading the logs.";
+
       setError(details);
     } finally {
       setLoading(false);
@@ -63,16 +104,23 @@ function UploadLogs() {
   return (
     <main className="upload-page">
       <div className="page-topbar">
-        <button type="button" className="secondary-button small-button" onClick={() => navigate("/")}>
+        <button
+          type="button"
+          className="secondary-button small-button"
+          onClick={() => navigate("/")}
+        >
           Back to Dashboard
         </button>
       </div>
 
       <h1>Upload Logs</h1>
-      <p className="page-summary">Upload application logs to start an incident investigation.</p>
+      <p className="page-summary">
+        Upload JSON application logs to start an incident investigation.
+      </p>
 
       <form className="upload-form" onSubmit={handleUpload}>
         <label htmlFor="investigation-name">Investigation Name</label>
+
         <input
           id="investigation-name"
           type="text"
@@ -82,30 +130,38 @@ function UploadLogs() {
         />
 
         <div className="upload-box">
-          <label htmlFor="log-files">Select log files (.log, .txt, .json)</label>
+          <label htmlFor="log-files">Select JSON log files</label>
+
           <input
             id="log-files"
             type="file"
-            accept=".log,.txt,.json"
+            accept=".json,application/json"
             multiple
             onChange={handleFileChange}
           />
 
           <small>
-            Supported file types: .log, .txt, .json. Maximum size per file: 10 MB. Up to 10 files per upload.
+            Supported format: JSON only. Maximum size per file: 1 MB.
+            Maximum 10 files per upload.
           </small>
         </div>
 
         {files.length > 0 && (
           <section className="selected-files">
             <h3>Selected Files</h3>
+
             <ul>
               {files.map((file, index) => (
                 <li key={`${file.name}-${index}`}>
                   <span>
                     {file.name} ({(file.size / 1024).toFixed(2)} KB)
                   </span>
-                  <button type="button" className="remove-button" onClick={() => removeFile(index)}>
+
+                  <button
+                    type="button"
+                    className="remove-button"
+                    onClick={() => removeFile(index)}
+                  >
                     Remove
                   </button>
                 </li>
